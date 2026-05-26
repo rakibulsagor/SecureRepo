@@ -1,0 +1,42 @@
+[
+  {
+    "rule_id": "debug_mode_enabled",
+    "category": "Beginner Mistake",
+    "pattern": "(?i)debug\\s*=\\s*True|DEBUG\\s*=\\s*True|debug\\s*:\\s*true",
+    "severity": "High",
+    "message": "Debug mode is enabled in application code. This can expose interactive debuggers, stack traces, and environment variables to users.",
+    "fix": "Disable debug mode in production. Use environment variables (e.g. `DEBUG = os.getenv('DEBUG', 'False') == 'True'`) to set debug mode dynamically."
+  },
+  {
+    "rule_id": "wildcard_cors",
+    "category": "Config",
+    "pattern": "(?i)allow_origins\\s*=\\s*\\[\\s*['\"]\\*['\"]\\s*\\]|cors_allowed_origins\\s*=\\s*['\"]\\*['\"]|allow_origin\\s*:\\s*['\"]\\*['\"]",
+    "severity": "Medium",
+    "message": "Wildcard CORS origin '*' detected. This allows any external website to make API requests to your server and read responses on behalf of users.",
+    "fix": "Replace '*' with a list of trusted domains (e.g., your staging or production frontend URLs). Read allowed origins from an environment variable."
+  },
+  {
+    "rule_id": "git_conflict_marker",
+    "category": "Beginner Mistake",
+    "pattern": "^<<<<<<< HEAD|^=======$|^>>>>>>> [0-9a-fA-F]{40}",
+    "severity": "Medium",
+    "message": "Git merge conflict marker committed. This indicates unmerged code changes that were accidentally committed, which can break execution or expose draft code.",
+    "fix": "Open the file, resolve the conflict manually, clean up the markers, and commit the resolved code."
+  },
+  {
+    "rule_id": "hardcoded_password",
+    "category": "Beginner Mistake",
+    "pattern": "(?i)(?:password|passwd|db_pass|mysql_password|postgres_password)\\s*=\\s*['\"](?:admin|root|password|123456|pass123|qwerty)['\"]",
+    "severity": "High",
+    "message": "Common insecure hardcoded password or credential configuration detected (e.g., 'admin', 'root', 'password').",
+    "fix": "Remove the hardcoded credential. Load passwords securely via environment variables or query secrets from a vault."
+  },
+  {
+    "rule_id": "insecure_http_cookie",
+    "category": "Config",
+    "pattern": "secure\\s*=\\s*False|secureCookie\\s*:\\s*false",
+    "severity": "Medium",
+    "message": "Cookie 'secure' flag set to False. Cookies containing session tokens or sensitive data can be transmitted over unencrypted HTTP, risking interception.",
+    "fix": "Set `secure=True` (or `secureCookie: true`) to ensure cookies are only transmitted over HTTPS connections."
+  }
+]

@@ -1,0 +1,38 @@
+[
+  {
+    "pattern": "^\\.env(?:\\..*)?$",
+    "severity": "Critical",
+    "message": "Environment file committed to version control. This file typically contains secret API keys, database credentials, and session salts.",
+    "fix": "Remove the file from git history (`git rm --cached .env`), add it to your `.gitignore`, and rotate all credentials contained within it immediately."
+  },
+  {
+    "pattern": ".*service[aA]ccount.*\\.json$",
+    "severity": "Critical",
+    "message": "Firebase or Google Cloud Service Account Key file committed. Anyone who has this key has admin privileges to your Firestore database and Cloud services.",
+    "fix": "Revoke the service account key in the Google Cloud Console immediately. Delete the file from the repository, and load service account details using environment variables."
+  },
+  {
+    "pattern": "^id_(?:rsa|dsa|ecdsa|ed25519)$",
+    "severity": "Critical",
+    "message": "SSH Private Key committed. Attackers can use this key to authenticate to servers or remote machines.",
+    "fix": "Remove the key from git history, replace the key pair in all target servers/accounts, and add `id_*` keys to `.gitignore`."
+  },
+  {
+    "pattern": "^\\.npmrc$|^\\.pypirc$|^\\.netrc$|^\\.git-credentials$",
+    "severity": "Critical",
+    "message": "Authentication config file containing system or registry access tokens committed.",
+    "fix": "Remove the file, revoke the corresponding tokens (npm token, PyPI token, etc.), and use environment variable injection for CI/CD authentication."
+  },
+  {
+    "pattern": "^db\\.sqlite3$|^database\\.db$|^local\\.db$",
+    "severity": "Medium",
+    "message": "SQLite database committed. This is risky because it exposes internal data structure and schema, and can leak user data or metadata from testing.",
+    "fix": "Remove the SQLite database file from git history. Configure your application to create a new database on start, or use a hosted database server. Add database files to `.gitignore`."
+  },
+  {
+    "pattern": ".*\\.pem$|.*\\.p12$|.*\\.pkcs12$",
+    "severity": "High",
+    "message": "Private Certificate or Key Store file committed. Exposes SSL/TLS private keys or application signing credentials.",
+    "fix": "Revoke the certificate and key, issue new certificates, and avoid storing certificates directly in the codebase. Use secrets managers."
+  }
+]

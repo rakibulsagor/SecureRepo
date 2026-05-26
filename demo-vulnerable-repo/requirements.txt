@@ -1,0 +1,5 @@
+# Demo python requirements with vulnerabilities
+requests==2.18.4
+Django==3.0.1
+urllib3==1.25.3
+numpy==1.19.0

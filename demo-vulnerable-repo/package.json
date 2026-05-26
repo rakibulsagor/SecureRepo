@@ -1,0 +1,14 @@
+{
+  "name": "demo-vulnerable-repo",
+  "version": "1.0.0",
+  "description": "Student mock repository containing security errors and EOL frameworks.",
+  "main": "src/firebase.js",
+  "engines": {
+    "node": ">=14.0.0 <16.0.0"
+  },
+  "dependencies": {
+    "express": "4.16.0",
+    "lodash": "4.17.15",
+    "axios": "0.19.0"
+  }
+}

@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Python Runtime",
+    "type": "Python",
+    "min_secure_version": "3.9.0",
+    "severity": "High",
+    "reason": "Python versions 3.8 and below are End-Of-Life (EOL) and no longer receive official security patches.",
+    "fix": "Upgrade your project to Python 3.9 or higher (recommended: 3.11 or 3.12). Update your `.python-version` or Dockerfile base image."
+  },
+  {
+    "name": "Node.js Runtime",
+    "type": "Node",
+    "min_secure_version": "18.0.0",
+    "severity": "High",
+    "reason": "Node.js versions below 18 (e.g. Node 14, 16) are End-Of-Life (EOL) and contain known critical vulnerabilities.",
+    "fix": "Upgrade your Node.js runtime environment to active LTS versions (Node 18 or 20). Update the `engines` field in package.json or your Dockerfile."
+  },
+  {
+    "name": "Docker Base Image Tag",
+    "type": "Docker",
+    "forbidden_tags": ["latest", "node:latest", "python:latest"],
+    "severity": "Medium",
+    "reason": "Using the 'latest' tag for base Docker images makes your builds non-deterministic and can pull vulnerable packages unexpectedly.",
+    "fix": "Pin your Docker base image to a specific version or SHA hash (e.g. `python:3.11-slim` instead of `python:latest`)."
+  }
+]

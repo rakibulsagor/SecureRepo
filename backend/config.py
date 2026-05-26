@@ -1,8 +1,13 @@
 import os
-from dotenv import load_dotenv
+
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
 
 # Load .env file from backend directory or root directory
-load_dotenv()
+if load_dotenv:
+    load_dotenv()
 
 class Settings:
     PORT: int = int(os.getenv("PORT", 8000))

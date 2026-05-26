@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
+  GoogleAuthProvider,
+  signInWithPopup,
   signOut, 
   onAuthStateChanged,
   updateProfile
@@ -92,6 +94,30 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const loginWithGoogle = async () => {
+    if (!isMockAuth && auth) {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const userCredential = await signInWithPopup(auth, provider);
+      const displayName = userCredential.user.displayName || userCredential.user.email?.split('@')[0] || 'Google User';
+      setCurrentUser({
+        uid: userCredential.user.uid,
+        email: userCredential.user.email,
+        displayName,
+      });
+      return userCredential.user;
+    } else {
+      const mockUser = {
+        uid: 'mock-google-uid-default',
+        email: 'google.demo@securerepo.local',
+        displayName: 'Google Demo User',
+      };
+      localStorage.setItem('securerepo_mock_user', JSON.stringify(mockUser));
+      setCurrentUser(mockUser);
+      return mockUser;
+    }
+  };
+
   const logout = async () => {
     if (!isMockAuth && auth) {
       await signOut(auth);
@@ -106,6 +132,7 @@ export function AuthProvider({ children }) {
     isMockAuth,
     signup,
     login,
+    loginWithGoogle,
     logout,
     loading
   };

@@ -8,7 +8,11 @@
     "backend": {
       "entrypoint": "backend/main.py",
       "framework": "fastapi",
-      "routePrefix": "/_/backend"
+      "routePrefix": "/_/backend",
+      "includeFiles": [
+        "backend/**",
+        "demo-vulnerable-repo/**"
+      ]
     }
   }
 }

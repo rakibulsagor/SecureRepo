@@ -1,13 +1,17 @@
 import os
 import json
 from typing import List, Dict, Any, Optional
-import google.generativeai as genai
 from backend.config import settings
 from backend.models.issue_models import Issue
 
+try:
+    import google.generativeai as genai
+except ImportError:
+    genai = None
+
 class GeminiService:
     def __init__(self):
-        self.is_configured = settings.is_gemini_configured
+        self.is_configured = settings.is_gemini_configured and genai is not None
         if self.is_configured:
             try:
                 genai.configure(api_key=settings.GEMINI_API_KEY)

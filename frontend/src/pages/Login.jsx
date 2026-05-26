@@ -9,7 +9,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
-  const { login, isMockAuth } = useAuth();
+  const { login, loginWithGoogle, isMockAuth } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -23,6 +23,21 @@ export default function Login() {
     } catch (err) {
       console.error(err);
       setError(err.message || 'Failed to log in. Check your email and password.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setError('');
+    setLoading(true);
+
+    try {
+      await loginWithGoogle();
+      navigate('/dashboard');
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to sign in with Google.');
     } finally {
       setLoading(false);
     }
@@ -103,6 +118,28 @@ export default function Login() {
               )}
             </button>
           </form>
+
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-slate-800/80"></div>
+            <span className="text-[11px] uppercase tracking-wider text-slate-500">or</span>
+            <div className="h-px flex-1 bg-slate-800/80"></div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-3 rounded-lg border border-slate-700 bg-slate-950/40 px-4 py-3 text-sm font-semibold text-slate-100 transition-colors hover:border-cyan-500/50 hover:bg-slate-900 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {loading ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              <>
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-sm font-black text-slate-900">G</span>
+                Continue with Google
+              </>
+            )}
+          </button>
 
           <div className="border-t border-slate-800/60 pt-4 text-center text-xs text-slate-400">
             Don't have an account?{' '}

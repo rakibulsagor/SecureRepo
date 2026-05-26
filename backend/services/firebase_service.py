@@ -1,15 +1,17 @@
 import os
 import json
 import datetime
+import tempfile
 from typing import List, Dict, Any, Optional
 from backend.firebase_admin_config import db, is_mock
 
 class FirebaseService:
     def __init__(self):
         self.is_mock = is_mock
-        # Setup mock DB file path
-        dir_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.mock_db_path = os.path.join(dir_path, "mock_db.json")
+        self.mock_db_path = os.getenv(
+            "MOCK_DB_PATH",
+            os.path.join(tempfile.gettempdir(), "securerepo_mock_db.json")
+        )
         self._init_mock_db()
 
     def _init_mock_db(self):

@@ -8,11 +8,8 @@ from backend.utils.repo_url_parser import parse_repo_url
 
 class GitHubService:
     def __init__(self):
-        # Establish a stable temp directory inside the backend folder for scanning
-        self.base_temp_dir = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
-            "temp_repos"
-        )
+        self.project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        self.base_temp_dir = os.path.join(tempfile.gettempdir(), "securerepo_temp_repos")
         os.makedirs(self.base_temp_dir, exist_ok=True)
 
     def _remove_readonly(self, func, path, excinfo):
@@ -27,6 +24,11 @@ class GitHubService:
         Otherwise, clones the repository into a unique temporary directory.
         Returns: (local_path, owner, name, clean_url)
         """
+        local_path = self._resolve_local_path(repo_url)
+        if local_path:
+            name = os.path.basename(os.path.normpath(local_path)) or "local-repo"
+            return local_path, "local", name, local_path
+
         owner, name, clean_path = parse_repo_url(repo_url)
         if not owner or not name:
             raise ValueError(f"Invalid repository URL or path: {repo_url}")
@@ -36,9 +38,7 @@ class GitHubService:
             # If path is relative, resolve it relative to the project root
             resolved_path = clean_path
             if not os.path.isabs(resolved_path):
-                # Try relative to backend, or root
-                root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-                resolved_path = os.path.abspath(os.path.join(root_dir, clean_path))
+                resolved_path = os.path.abspath(os.path.join(self.project_root, clean_path))
                 
             if os.path.exists(resolved_path) and os.path.isdir(resolved_path):
                 return resolved_path, "local", name, resolved_path
@@ -67,13 +67,28 @@ class GitHubService:
             self.cleanup(target_path)
             raise RuntimeError(f"Error cloning repository: {str(e)}")
 
+    def _resolve_local_path(self, repo_url: str) -> Optional[str]:
+        clean_path = repo_url.strip().replace("file://", "")
+        candidates = [clean_path]
+
+        if not os.path.isabs(clean_path):
+            candidates.append(os.path.join(self.project_root, clean_path))
+            candidates.append(os.path.abspath(clean_path))
+
+        for candidate in candidates:
+            resolved = os.path.abspath(candidate)
+            if os.path.isdir(resolved):
+                return resolved
+
+        return None
+
     def cleanup(self, path: str):
         """Cleans up the temporary directory."""
         if not path:
             return
             
         # Ensure we only delete folders inside our temp directory
-        if not path.startswith(self.base_temp_dir):
+        if os.path.commonpath([os.path.abspath(path), self.base_temp_dir]) != self.base_temp_dir:
             return
 
         if os.path.exists(path):

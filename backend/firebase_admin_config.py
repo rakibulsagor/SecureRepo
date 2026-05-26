@@ -1,12 +1,18 @@
 import os
-import firebase_admin
-from firebase_admin import credentials, firestore
 from backend.config import settings
+
+try:
+    import firebase_admin
+    from firebase_admin import credentials, firestore
+except ImportError:
+    firebase_admin = None
+    credentials = None
+    firestore = None
 
 db = None
 is_mock = True
 
-if settings.is_firebase_configured:
+if settings.is_firebase_configured and firebase_admin:
     try:
         # Format the private key to handle newline characters properly
         private_key = settings.FIREBASE_PRIVATE_KEY.replace('\\n', '\n')

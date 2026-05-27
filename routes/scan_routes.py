@@ -1,9 +1,11 @@
 from flask import Blueprint, jsonify, request
 
 from services.report_service import ReportService
+from services.guide_service import GuideService
 
 scan_blueprint = Blueprint("scan", __name__)
 report_service = ReportService()
+guide_service = GuideService()
 
 
 @scan_blueprint.post("/api/scan")
@@ -27,3 +29,11 @@ def scan_repository():
         return jsonify({"detail": str(exc)}), 502
     except Exception as exc:
         return jsonify({"detail": f"Internal scanning error: {exc}"}), 500
+
+
+@scan_blueprint.post("/api/guide")
+def get_fix_guide():
+    payload = request.get_json(silent=True) or {}
+    guide = guide_service.get_guide_for_finding(payload)
+    return jsonify(guide)
+

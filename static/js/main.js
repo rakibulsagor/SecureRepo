@@ -27,6 +27,18 @@
   var primaryNav = document.querySelector("[data-primary-nav]");
   var menuButton = document.querySelector("[data-menu-button]");
   var logTimer = null;
+  var currentReport = null;
+  var modalEl = document.getElementById("fix-guide-modal");
+  var modalSeverity = document.getElementById("modal-severity");
+  var modalFileInfo = document.getElementById("modal-file-info");
+  var modalTitle = document.getElementById("modal-title");
+  var modalDescription = document.getElementById("modal-description");
+  var modalSteps = document.getElementById("modal-steps");
+  var modalBeforeCode = document.getElementById("modal-before-code");
+  var modalAfterCode = document.getElementById("modal-after-code");
+  var modalResources = document.getElementById("modal-resources");
+  var modalCopyBtn = document.getElementById("modal-copy-btn");
+  var copyBtnText = document.getElementById("copy-btn-text");
 
   function apiUrl(path) {
     return API_BASE + path;
@@ -139,6 +151,7 @@
   }
 
   function renderReport(report) {
+    currentReport = report;
     var summary = report.summary || {};
     var issues = report.findings || [];
 
@@ -167,10 +180,10 @@
 
     document.querySelector("[data-ai-summary]").innerHTML = "<strong>Report summary</strong><p>SecureRepo found " + issues.length + " issue(s). Review each finding and apply the recommended fixes before sharing this repository.</p>";
 
-    document.querySelector("[data-issue-list]").innerHTML = issues.length ? issues.map(renderIssue).join("") : '<div class="issue-card">No issues found. Nice clean scan.</div>';
+    document.querySelector("[data-issue-list]").innerHTML = issues.length ? issues.map(function (issue, index) { return renderIssue(issue, index); }).join("") : '<div class="issue-card">No issues found. Nice clean scan.</div>';
   }
 
-  function renderIssue(issue) {
+  function renderIssue(issue, index) {
     var severity = String(issue.severity || "low").toLowerCase();
     var explanation = issue.beginner_explanation || issue.studentExplanation || "";
     return '<article class="finding-card">' +
@@ -182,7 +195,7 @@
       '<span class="file-path"><span class="material-symbols-outlined">description</span>' + escapeHtml(issue.file || "unknown file") + (issue.line ? " : Line " + escapeHtml(issue.line) : "") + '</span>' +
       '<p>' + escapeHtml(issue.message || "") + '</p>' +
       (explanation ? '<div class="beginner-box"><h4><span class="material-symbols-outlined">lightbulb</span> Beginner Explanation</h4><p>' + escapeHtml(explanation) + '</p></div>' : "") +
-      '<div class="finding-fix"><span><span class="material-symbols-outlined">warning</span> Recommended: ' + escapeHtml(issue.fix || "Review this finding and update the affected code.") + '</span><button class="button primary" type="button">View Fix Guide</button></div>' +
+      '<div class="finding-fix"><span><span class="material-symbols-outlined">warning</span> Recommended: ' + escapeHtml(issue.fix || "Review this finding and update the affected code.") + '</span><button class="button primary" type="button" data-issue-index="' + index + '">View Fix Guide</button></div>' +
       '</div>' +
       '</article>';
   }
@@ -315,6 +328,154 @@
       primaryNav.classList.remove("open");
       menuButton.setAttribute("aria-expanded", "false");
     });
+
+    var issueList = document.querySelector("[data-issue-list]");
+    if (issueList) {
+      issueList.addEventListener("click", function (event) {
+        var fixBtn = event.target.closest("button");
+        if (fixBtn && fixBtn.getAttribute("data-issue-index") !== null) {
+          var index = parseInt(fixBtn.getAttribute("data-issue-index"), 10);
+          if (currentReport && currentReport.findings && currentReport.findings[index]) {
+            showFixGuide(currentReport.findings[index]);
+          }
+        }
+      });
+    }
+
+    var closeBtn = document.getElementById("modal-close-btn");
+    var doneBtn = document.getElementById("modal-done-btn");
+    if (closeBtn) {
+      closeBtn.addEventListener("click", closeModal);
+    }
+    if (doneBtn) {
+      doneBtn.addEventListener("click", closeModal);
+    }
+    if (modalEl) {
+      modalEl.addEventListener("click", function (event) {
+        if (event.target === modalEl) {
+          closeModal();
+        }
+      });
+    }
+    window.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && modalEl && modalEl.classList.contains("open")) {
+        closeModal();
+      }
+    });
+
+    if (modalCopyBtn && copyBtnText && modalAfterCode) {
+      modalCopyBtn.addEventListener("click", function () {
+        var secureCode = modalAfterCode.textContent;
+        navigator.clipboard.writeText(secureCode)
+          .then(function () {
+            copyBtnText.textContent = "Copied!";
+            setTimeout(function () {
+              copyBtnText.textContent = "Copy Secure Code";
+            }, 2000);
+          })
+          .catch(function () {
+            copyBtnText.textContent = "Failed to copy";
+          });
+      });
+    }
+  }
+
+  function openModal() {
+    if (modalEl) {
+      modalEl.classList.add("open");
+      document.body.style.overflow = "hidden";
+    }
+  }
+
+  function closeModal() {
+    if (modalEl) {
+      modalEl.classList.remove("open");
+      if (document.body.style.removeAttribute) {
+        document.body.style.removeAttribute("overflow");
+      } else {
+        document.body.style.overflow = "";
+      }
+    }
+  }
+
+  function showFixGuide(issue) {
+    if (!issue) return;
+
+    if (copyBtnText) copyBtnText.textContent = "Copy Secure Code";
+
+    if (modalSeverity) {
+      var severity = String(issue.severity || "low").toLowerCase();
+      modalSeverity.className = "severity " + severity;
+      modalSeverity.textContent = issue.severity || "Low";
+    }
+    if (modalFileInfo) {
+      modalFileInfo.textContent = (issue.file || "unknown file") + (issue.line ? " : Line " + issue.line : "");
+    }
+
+    if (modalTitle) modalTitle.textContent = "Loading guide...";
+    if (modalDescription) modalDescription.textContent = "Fetching recommendations from SecureRepo...";
+    if (modalSteps) modalSteps.innerHTML = '<li class="guide-step"><div class="guide-step-number">1</div><div class="guide-step-content"><div class="guide-step-title">Please wait</div><div class="guide-step-detail">Loading instructions...</div></div></li>';
+    if (modalBeforeCode) modalBeforeCode.textContent = "Loading...";
+    if (modalAfterCode) modalAfterCode.textContent = "Loading...";
+    if (modalResources) modalResources.innerHTML = "";
+
+    openModal();
+
+    request("/api/guide", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(issue)
+    })
+      .then(function (guide) {
+        if (modalTitle) modalTitle.textContent = guide.title || ("Fix: " + (issue.type || "Issue"));
+        if (modalDescription) modalDescription.textContent = guide.description || (issue.message || "");
+        
+        if (modalSteps) {
+          var stepsHtml = "";
+          if (guide.steps && guide.steps.length) {
+            stepsHtml = guide.steps.map(function (step, idx) {
+              return '<li class="guide-step">' +
+                '<div class="guide-step-number">' + (idx + 1) + '</div>' +
+                '<div class="guide-step-content">' +
+                '<div class="guide-step-title">' + escapeHtml(step.title) + '</div>' +
+                '<div class="guide-step-detail">' + escapeHtml(step.detail) + '</div>' +
+                '</div>' +
+                '</li>';
+            }).join("");
+          } else {
+            stepsHtml = '<li class="guide-step">' +
+              '<div class="guide-step-number">1</div>' +
+              '<div class="guide-step-content">' +
+              '<div class="guide-step-title">Review the issue</div>' +
+              '<div class="guide-step-detail">' + escapeHtml(issue.fix || "Check affected code and resolve manually.") + '</div>' +
+              '</div>' +
+              '</li>';
+          }
+          modalSteps.innerHTML = stepsHtml;
+        }
+
+        if (modalBeforeCode) modalBeforeCode.textContent = guide.before_code || "";
+        if (modalAfterCode) modalAfterCode.textContent = guide.after_code || "";
+
+        if (modalResources) {
+          var resHtml = "";
+          if (guide.resources && guide.resources.length) {
+            resHtml = guide.resources.map(function (res) {
+              return '<a class="guide-resource-link" href="' + escapeHtml(res.url) + '" target="_blank" rel="noopener noreferrer">' +
+                '<span class="material-symbols-outlined" style="font-size: 16px; margin-right: 4px;">launch</span>' +
+                '<span>' + escapeHtml(res.name) + '</span>' +
+                '</a>';
+            }).join("");
+          } else {
+            resHtml = '<span class="muted">No external links available.</span>';
+          }
+          modalResources.innerHTML = resHtml;
+        }
+      })
+      .catch(function (err) {
+        if (modalTitle) modalTitle.textContent = "Error loading guide";
+        if (modalDescription) modalDescription.textContent = err.message || "Failed to load fix instructions from the API server.";
+      });
   }
 
   function init() {

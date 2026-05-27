@@ -1,0 +1,32 @@
+[
+  {
+    "pattern": "(?i)https?://[^\\s\"'`]+\\?(?:[^\\s\"'`]*)(api[_-]?key|token|secret|password)=",
+    "severity": "High",
+    "message": "API credentials appear to be passed through a URL query string. Query strings are commonly logged by browsers, proxies, servers, and analytics tools.",
+    "fix": "Move secrets to server-side environment variables and send credentials in secure headers or backend-only requests instead of URL parameters."
+  },
+  {
+    "pattern": "(?i)(fetch|axios\\.(get|post|put|delete)|requests\\.(get|post|put|delete))\\s*\\(\\s*[\"']http://",
+    "severity": "Medium",
+    "message": "An API call uses plain HTTP. Data sent over HTTP can be intercepted or modified in transit.",
+    "fix": "Use HTTPS API endpoints and reject insecure transport in production."
+  },
+  {
+    "pattern": "(?i)(@app\\.(get|post|put|delete|patch)|router\\.(get|post|put|delete|patch)|app\\.(get|post|put|delete|patch))\\s*\\(\\s*[\"']/(admin|debug|internal|test|dev|private)",
+    "severity": "High",
+    "message": "A sensitive-looking API route is exposed. Admin, debug, internal, or test endpoints are risky if deployed publicly.",
+    "fix": "Protect sensitive endpoints with authentication and authorization, or remove them from production builds."
+  },
+  {
+    "pattern": "(?i)(debug|admin|internal)[_-]?(api|route|endpoint).*(true|enabled|public)",
+    "severity": "Medium",
+    "message": "A debug or admin API appears to be enabled publicly.",
+    "fix": "Disable debug/admin APIs by default and enable them only behind authenticated, role-checked access."
+  },
+  {
+    "pattern": "(?i)(Access-Control-Allow-Origin|allow_origins|origin)\\s*[:=]\\s*\\[?\\s*[\"']\\*",
+    "severity": "High",
+    "message": "An API CORS setting allows any origin. This can let untrusted websites call your backend from a user's browser.",
+    "fix": "Replace wildcard CORS with a short allowlist of trusted frontend domains."
+  }
+]

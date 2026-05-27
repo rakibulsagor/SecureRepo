@@ -6,6 +6,7 @@ from backend.scanners.secret_scanner import SecretScanner
 from backend.scanners.risky_file_scanner import RiskyFileScanner
 from backend.scanners.software_version_scanner import SoftwareVersionScanner
 from backend.scanners.config_scanner import ConfigScanner
+from backend.scanners.vulnerable_api_scanner import VulnerableApiScanner
 from backend.scanners.beginner_mistake_scanner import BeginnerMistakeScanner
 from backend.services.score_service import calculate_score, get_risk_level
 
@@ -15,6 +16,7 @@ class ScannerEngine:
         self.risky_file_scanner = RiskyFileScanner()
         self.software_version_scanner = SoftwareVersionScanner()
         self.config_scanner = ConfigScanner()
+        self.vulnerable_api_scanner = VulnerableApiScanner()
         self.beginner_mistake_scanner = BeginnerMistakeScanner()
 
     def run_scan(self, repo_path: str, repo_owner: str, repo_name: str, repo_url: str, user_id: str = None) -> Tuple[List[Issue], List[DetectedSoftware], int, str, ScanSummary]:
@@ -31,6 +33,9 @@ class ScannerEngine:
         issues.extend(self.risky_file_scanner.scan(repo_path, scan_id, user_id))
 
 
+
+        # 3. Run vulnerable API scanner
+        issues.extend(self.vulnerable_api_scanner.scan(repo_path, scan_id, user_id))
 
         # 4. Run software version scanner
         soft_issues, soft_software = self.software_version_scanner.scan(repo_path, scan_id, user_id)

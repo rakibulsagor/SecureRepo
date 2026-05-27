@@ -1,197 +1,111 @@
-# SecureRepo 🛡️
+# SecureRepo: Python Backend Architecture
 
-SecureRepo is a student-friendly GitHub security checker. It scans public GitHub repositories for leaked secrets, unsafe files, outdated software/framework versions, unsafe configs, and beginner security mistakes. It then uses Gemini to explain the results in a beginner-friendly way.
+SecureRepo is a student-friendly GitHub security scanner built with FastAPI. The backend logic is separated by responsibility so the code stays clean, maintainable, and beginner-friendly.
 
-> **Final Product Statement**: SecureRepo helps student developers scan their GitHub projects before teachers, recruiters, or attackers see them. It detects leaked secrets, risky files, old software versions, and beginner security mistakes using rule-based scanners, then uses Gemini only to explain the results in simple language.
+The frontend is plain HTML, CSS, and JavaScript in `frontend/`. The backend follows the structure below inside `backend/`.
 
----
-
-## 🏗️ Architecture
+## Directory Structure
 
 ```text
-User
- ↓
-React + Vite Frontend (Tailwind CSS)
- ↓
-FastAPI Backend
- ↓
-GitHub Service (Anonymous Shallow Clone)
- ↓
-Rule-Based Scanner Engine
- ├── Secret Scanner
- ├── Risky File Scanner
- ├── Software Version Scanner
- ├── Config Scanner
- └── Beginner Mistake Scanner
- ↓
-Score Service (Calculates Security Score 0 - 100)
- ↓
-Gemini Explanation Service (Explains findings in simple student-friendly language)
- ↓
-Firebase Firestore & Auth (Scans, Users, Reports, Issues)
+backend/
+├── main.py
+├── routes/
+│   └── scan_routes.py
+├── services/
+│   ├── github_service.py
+│   ├── report_service.py
+│   └── score_service.py
+├── scanners/
+│   ├── secret_scanner.py
+│   ├── risky_file_scanner.py
+│   ├── vulnerable_api_scanner.py
+│   ├── software_version_scanner.py
+│   ├── config_scanner.py
+│   └── beginner_mistake_scanner.py
+├── data/
+│   ├── secret_patterns.json
+│   ├── risky_files.json
+│   ├── vulnerable_api_rules.json
+│   └── software_versions.json
+└── requirements.txt
 ```
 
----
+## Component Responsibilities
 
-## 🛠️ Stack
+### Core
 
-- **Frontend**: React + Vite + Tailwind CSS + Firebase Client SDK
-- **Backend**: Python FastAPI + Uvicorn + Firebase Admin SDK + Google Generative AI (Gemini) SDK
-- **Scanners**: Python Rule-Based Regex and AST Modules (not AI-based to ensure determinism and compliance with rules)
-- **AI Helper**: Gemini API (explanations, fixes, summaries only)
-- **Database**: Firebase Auth + Cloud Firestore
+- `main.py`: Initializes FastAPI, includes routers, serves the plain frontend, and provides `/health`.
 
----
+### Routes
 
-## 📁 Repository Structure
+- `scan_routes.py`: Defines `POST /api/scan`. It accepts a GitHub URL or local path and returns a structured JSON report.
 
-```text
-securerepo/
-│
-├── README.md
-├── .gitignore
-├── .env.example
-│
-├── frontend/
-│   ├── package.json
-│   ├── vite.config.js
-│   ├── index.html
-│   ├── tailwind.config.js
-│   ├── postcss.config.js
-│   │
-│   └── src/
-│       ├── main.jsx
-│       ├── App.jsx
-│       │
-│       ├── api/
-│       │   └── scanApi.js
-│       │
-│       ├── firebase/
-│       │   └── firebaseConfig.js
-│       │
-│       ├── pages/
-│       │   ├── Home.jsx
-│       │   ├── Login.jsx
-│       │   ├── Dashboard.jsx
-│       │   ├── Report.jsx
-│       │   ├── History.jsx
-│       │   └── Learn.jsx
-│       │
-│       ├── components/
-│       │   ├── Navbar.jsx
-│       │   ├── RepoInput.jsx
-│       │   ├── LoadingScan.jsx
-│       │   ├── ScoreCard.jsx
-│       │   ├── IssueCard.jsx
-│       │   ├── SeverityBadge.jsx
-│       │   ├── SoftwareVersionTable.jsx
-│       │   ├── AiExplanationBox.jsx
-│       │   ├── ScanHistoryCard.jsx
-│       │   └── EmptyState.jsx
-│       │
-│       ├── hooks/
-│       │   └── useAuth.js
-│       │
-│       ├── utils/
-│       │   ├── formatDate.js
-│       │   └── severityHelper.js
-│       │
-│       └── styles/
-│           └── index.css
-│
-├── backend/
-│   ├── requirements.txt
-│   ├── main.py
-│   ├── config.py
-│   ├── firebase_admin_config.py
-│   │
-│   ├── routes/
-│   │   ├── health_routes.py
-│   │   ├── scan_routes.py
-│   │   └── history_routes.py
-│   │
-│   ├── services/
-│   │   ├── github_service.py
-│   │   ├── gemini_service.py
-│   │   ├── firebase_service.py
-│   │   ├── score_service.py
-│   │   └── report_service.py
-│   │
-│   ├── scanners/
-│   │   ├── scanner_engine.py
-│   │   ├── secret_scanner.py
-│   │   ├── risky_file_scanner.py
-│   │   ├── software_version_scanner.py
-│   │   ├── config_scanner.py
-│   │   └── beginner_mistake_scanner.py
-│   │
-│   ├── data/
-│   │   ├── secret_patterns.json
-│   │   ├── risky_files.json
-│   │   ├── software_versions.json
-│   │   └── beginner_rules.json
-│   │
-│   ├── models/
-│   │   ├── scan_models.py
-│   │   ├── issue_models.py
-│   │   └── repo_models.py
-│   │
-│   ├── utils/
-│   │   ├── repo_url_parser.py
-│   │   ├── file_filters.py
-│   │   ├── line_finder.py
-│   │   └── severity.py
-│   │
-│   └── tests/
-│       ├── test_secret_scanner.py
-│       ├── test_risky_file_scanner.py
-│       ├── test_software_version_scanner.py
-│       ├── test_config_scanner.py
-│       └── test_score_service.py
-│
-├── demo-vulnerable-repo/
-│   ├── README.md
-│   ├── .env
-│   ├── Dockerfile
-│   ├── runtime.txt
-│   ├── .python-version
-│   ├── .nvmrc
-│   └── src/
-│       ├── firebase.js
-│       ├── app.py
-│       └── settings.py
-│
-└── docs/
-    ├── pitch.md
-    ├── demo-script.md
-    ├── features.md
-    └── future-scope.md
+### Services
+
+- `github_service.py`: Resolves local repository paths or clones public GitHub repositories.
+- `report_service.py`: Runs scanners and aggregates findings into the response format.
+- `score_service.py`: Calculates the 0-100 score and risk level.
+
+### Scanners
+
+- `secret_scanner.py`: Detects leaked credentials.
+- `risky_file_scanner.py`: Detects sensitive files such as `.env`, `.pem`, SQLite databases, and private keys.
+- `vulnerable_api_scanner.py`: Detects unsafe API patterns.
+- `software_version_scanner.py`: Detects outdated runtime/dependency configuration.
+- `config_scanner.py`: Reviews deployment and config weaknesses.
+- `beginner_mistake_scanner.py`: Finds common student coding mistakes.
+
+## API Response Format
+
+```json
+{
+  "repository": "username/repo-name",
+  "score": 82,
+  "risk_level": "Medium",
+  "summary": {
+    "critical": 0,
+    "high": 1,
+    "medium": 3,
+    "low": 5
+  },
+  "findings": [
+    {
+      "type": "Secret Leaked",
+      "severity": "High",
+      "file": "src/config.js",
+      "line": 12,
+      "message": "Potential AWS Secret Key found.",
+      "fix": "Use environment variables or a secret manager.",
+      "beginner_explanation": "A secret is like a digital key. If it is committed to code, anyone who can see the repo may be able to use your account or service."
+    }
+  ]
+}
 ```
 
----
+## Run Locally
 
-## ⚡ Quick Start (Local Development)
-
-Both frontend and backend are designed to run in **Mock Mode** by default if Firebase or Gemini API credentials are not provided. This ensures instant testing capability!
-
-### 1. Run the Backend
 ```bash
 cd backend
 python -m venv venv
-# On Windows:
-.\venv\Scripts\activate
-# On Linux/macOS:
-source venv/bin/activate
+```
 
+On Windows:
+
+```bash
+.\venv\Scripts\activate
+```
+
+Install dependencies and run:
+
+```bash
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
-### 2. Run the Frontend
-```bash
-cd frontend
-npm install
-npm run dev
+Open:
+
+```text
+http://localhost:8000
 ```
-Open `http://localhost:5173` to test SecureRepo.
-You can use `https://github.com/your-username/your-repo` or target the local `demo-vulnerable-repo` path to see the scanners in action!
+
+Use `demo-vulnerable-repo` in the scanner input for a local demo scan.

@@ -1,250 +1,102 @@
-import os
 import json
+import os
 import re
-from typing import List, Tuple
-from backend.models.issue_models import Issue
-from backend.models.scan_models import DetectedSoftware
+
 
 class SoftwareVersionScanner:
     def __init__(self):
-        self.rules = []
-        self.load_rules()
+        self.rules = self._load_rules()
 
-    def load_rules(self):
+    def scan(self, repo_path):
+        findings = []
+        python_rule = self._rule_for("Python")
+        node_rule = self._rule_for("Node")
+        docker_rule = self._rule_for("Docker")
+
+        findings.extend(self._scan_python_version(repo_path, python_rule))
+        findings.extend(self._scan_package_json(repo_path, node_rule))
+        findings.extend(self._scan_dockerfile(repo_path, python_rule, node_rule, docker_rule))
+        return findings
+
+    def _scan_python_version(self, repo_path, rule):
+        findings = []
+        for filename in [".python-version", "runtime.txt"]:
+            path = os.path.join(repo_path, filename)
+            if not os.path.exists(path) or not rule:
+                continue
+            with open(path, "r", encoding="utf-8", errors="ignore") as file:
+                content = file.read().strip()
+            match = re.search(r"([0-9]+(?:\.[0-9]+){0,2})", content)
+            if match and self._is_outdated(match.group(1), rule["min_secure_version"]):
+                findings.append(self._finding(rule, filename, None, f"Outdated Python runtime detected: {content}. {rule['reason']}"))
+        return findings
+
+    def _scan_package_json(self, repo_path, rule):
+        path = os.path.join(repo_path, "package.json")
+        if not os.path.exists(path) or not rule:
+            return []
         try:
-            dir_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            rules_path = os.path.join(dir_path, "data", "software_versions.json")
-            if os.path.exists(rules_path):
-                with open(rules_path, "r", encoding="utf-8") as f:
-                    self.rules = json.load(f)
-            else:
-                print(f"Warning: Software version rules not found at {rules_path}")
-        except Exception as e:
-            print(f"Error loading software version rules: {e}")
+            with open(path, "r", encoding="utf-8") as file:
+                package_data = json.load(file)
+        except (OSError, json.JSONDecodeError):
+            return []
 
-    def parse_version(self, version_str: str) -> List[int]:
-        cleaned = re.sub(r'^[^\d]+', '', version_str).strip()
-        cleaned = re.split(r'[-+\s]', cleaned)[0]
-        parts = []
-        for part in cleaned.split('.'):
-            try:
-                parts.append(int(part))
-            except ValueError:
-                parts.append(0)
-        # Pad with zeros to ensure at least [major, minor, patch]
+        engine = package_data.get("engines", {}).get("node")
+        if not engine:
+            return []
+        match = re.search(r"([0-9]+(?:\.[0-9]+){0,2})", engine)
+        if match and self._is_outdated(match.group(1), rule["min_secure_version"]):
+            return [self._finding(rule, "package.json", None, f"Outdated Node.js engine target detected: {engine}. {rule['reason']}")]
+        return []
+
+    def _scan_dockerfile(self, repo_path, python_rule, node_rule, docker_rule):
+        path = os.path.join(repo_path, "Dockerfile")
+        if not os.path.exists(path):
+            return []
+
+        findings = []
+        with open(path, "r", encoding="utf-8", errors="ignore") as file:
+            for line_number, line in enumerate(file, 1):
+                match = re.match(r"^\s*FROM\s+([a-zA-Z0-9_\-./]+)(?::([a-zA-Z0-9_.\-]+))?", line)
+                if not match:
+                    continue
+                image, tag = match.group(1), match.group(2) or "latest"
+                if tag == "latest" and docker_rule:
+                    findings.append(self._finding(docker_rule, "Dockerfile", line_number, f"Docker image {image} uses the latest tag. {docker_rule['reason']}"))
+                if "python" in image.lower() and python_rule and self._is_outdated(tag, python_rule["min_secure_version"]):
+                    findings.append(self._finding(python_rule, "Dockerfile", line_number, f"Outdated Python Docker image detected: python:{tag}. {python_rule['reason']}"))
+                if "node" in image.lower() and node_rule and self._is_outdated(tag, node_rule["min_secure_version"]):
+                    findings.append(self._finding(node_rule, "Dockerfile", line_number, f"Outdated Node Docker image detected: node:{tag}. {node_rule['reason']}"))
+        return findings
+
+    def _finding(self, rule, file_path, line, message):
+        return {
+            "type": "Outdated Software",
+            "severity": rule["severity"],
+            "file": file_path,
+            "line": line,
+            "message": message,
+            "fix": rule["fix"],
+        }
+
+    def _rule_for(self, rule_type):
+        return next((rule for rule in self.rules if rule["type"] == rule_type), None)
+
+    def _load_rules(self):
+        rules_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "software_versions.json")
+        with open(rules_path, "r", encoding="utf-8") as file:
+            return json.load(file)
+
+    def _is_outdated(self, current, minimum):
+        current_parts = self._version_parts(current)
+        minimum_parts = self._version_parts(minimum)
+        return current_parts < minimum_parts
+
+    def _version_parts(self, version):
+        match = re.search(r"([0-9]+(?:\.[0-9]+){0,2})", str(version))
+        if not match:
+            return [0, 0, 0]
+        parts = [int(part) for part in match.group(1).split(".")]
         while len(parts) < 3:
             parts.append(0)
         return parts[:3]
-
-    def is_outdated(self, current: str, secure_min: str) -> bool:
-        p_current = self.parse_version(current)
-        p_secure = self.parse_version(secure_min)
-        for val1, val2 in zip(p_current, p_secure):
-            if val1 < val2:
-                return True
-            elif val1 > val2:
-                return False
-        return False
-
-    def scan(self, repo_path: str, scan_id: str = None, user_id: str = None) -> Tuple[List[Issue], List[DetectedSoftware]]:
-        issues = []
-        detected_software = []
-
-        # Find rules
-        python_rule = next((r for r in self.rules if r["type"] == "Python"), None)
-        node_rule = next((r for r in self.rules if r["type"] == "Node"), None)
-        docker_rule = next((r for r in self.rules if r["type"] == "Docker"), None)
-
-        # 1. Check Python version files (.python-version, runtime.txt)
-        python_version_path = os.path.join(repo_path, ".python-version")
-        if os.path.exists(python_version_path):
-            try:
-                with open(python_version_path, "r", encoding="utf-8") as f:
-                    version = f.read().strip()
-                if version:
-                    clean_version = version.lstrip("python-")
-                    status = "Secure"
-                    if python_rule and self.is_outdated(clean_version, python_rule["min_secure_version"]):
-                        status = "Outdated"
-                        issues.append(Issue(
-                            scan_id=scan_id,
-                            user_id=user_id,
-                            type="Outdated Software",
-                            severity=python_rule["severity"],
-                            file=".python-version",
-                            line=None,
-                            message=f"Outdated Python runtime version detected: {version}. {python_rule['reason']}",
-                            fix=python_rule["fix"]
-                        ))
-                    detected_software.append(DetectedSoftware(
-                        name="Python",
-                        version=clean_version,
-                        status=status,
-                        type="Python",
-                        latest_stable=python_rule["min_secure_version"] if python_rule else None
-                    ))
-            except Exception as e:
-                print(f"Error scanning .python-version: {e}")
-
-        runtime_path = os.path.join(repo_path, "runtime.txt")
-        if os.path.exists(runtime_path):
-            try:
-                with open(runtime_path, "r", encoding="utf-8") as f:
-                    content = f.read().strip()
-                match = re.search(r'python-([0-9\.]+)', content)
-                if match:
-                    version = match.group(1)
-                    status = "Secure"
-                    if python_rule and self.is_outdated(version, python_rule["min_secure_version"]):
-                        status = "Outdated"
-                        issues.append(Issue(
-                            scan_id=scan_id,
-                            user_id=user_id,
-                            type="Outdated Software",
-                            severity=python_rule["severity"],
-                            file="runtime.txt",
-                            line=None,
-                            message=f"Outdated Python runtime version defined in runtime.txt: {content}. {python_rule['reason']}",
-                            fix=python_rule["fix"]
-                        ))
-                    detected_software.append(DetectedSoftware(
-                        name="Python (runtime.txt)",
-                        version=version,
-                        status=status,
-                        type="Python",
-                        latest_stable=python_rule["min_secure_version"] if python_rule else None
-                    ))
-            except Exception as e:
-                print(f"Error scanning runtime.txt: {e}")
-
-        # 2. Check Node engines version in package.json
-        package_json_path = os.path.join(repo_path, "package.json")
-        if os.path.exists(package_json_path):
-            try:
-                with open(package_json_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                node_engine = data.get("engines", {}).get("node")
-                if node_engine:
-                    # Clean engine version strings like ">=14.0.0" to a base number "14.0.0"
-                    clean_version = re.sub(r'^[^\d]+', '', node_engine).strip()
-                    status = "Secure"
-                    if node_rule and self.is_outdated(clean_version, node_rule["min_secure_version"]):
-                        status = "Outdated"
-                        issues.append(Issue(
-                            scan_id=scan_id,
-                            user_id=user_id,
-                            type="Outdated Software",
-                            severity=node_rule["severity"],
-                            file="package.json",
-                            line=None,
-                            message=f"Outdated Node.js engine target in package.json: '{node_engine}'. {node_rule['reason']}",
-                            fix=node_rule["fix"]
-                        ))
-                    detected_software.append(DetectedSoftware(
-                        name="Node.js Engine",
-                        version=clean_version,
-                        status=status,
-                        type="Node",
-                        latest_stable=node_rule["min_secure_version"] if node_rule else None
-                    ))
-            except Exception as e:
-                print(f"Error scanning package.json node engine: {e}")
-
-        # 3. Check Dockerfile base images
-        dockerfile_path = os.path.join(repo_path, "Dockerfile")
-        if os.path.exists(dockerfile_path):
-            try:
-                with open(dockerfile_path, "r", encoding="utf-8") as f:
-                    lines = f.readlines()
-                
-                for line_num, line in enumerate(lines, 1):
-                    line = line.strip()
-                    if line.startswith("#") or not line:
-                        continue
-                    
-                    # Look for FROM instruction
-                    # FROM image:tag or FROM image
-                    match = re.match(r'^FROM\s+([a-zA-Z0-9_\-\./]+)(?::([a-zA-Z0-9_\-\.]+))?(?:\s+AS\s+\w+)?', line, re.IGNORECASE)
-                    if match:
-                        image = match.group(1)
-                        tag = match.group(2) or ""
-                        
-                        # A. Check for forbidden tags (latest, or empty tag)
-                        is_tag_unsafe = not tag or tag.lower() == "latest"
-                        if is_tag_unsafe and docker_rule:
-                            issues.append(Issue(
-                                scan_id=scan_id,
-                                user_id=user_id,
-                                type="Config Weakness",
-                                severity=docker_rule["severity"],
-                                file="Dockerfile",
-                                line=line_num,
-                                message=f"Docker base image '{image}' is using '{tag or 'implicit latest'}' tag. {docker_rule['reason']}",
-                                fix=docker_rule["fix"]
-                            ))
-                            detected_software.append(DetectedSoftware(
-                                name=f"Docker Image: {image}",
-                                version="latest (implicit)",
-                                status="Warning",
-                                type="Docker",
-                                latest_stable="Pin specific tag"
-                            ))
-                        else:
-                            # B. Check image specific EOL runtimes (python/node base images)
-                            if "python" in image.lower() and python_rule:
-                                clean_version = re.sub(r'^[^\d]+', '', tag).split("-")[0]  # e.g., 3.8-slim -> 3.8
-                                status = "Secure"
-                                if self.is_outdated(clean_version, python_rule["min_secure_version"]):
-                                    status = "Outdated"
-                                    issues.append(Issue(
-                                        scan_id=scan_id,
-                                        user_id=user_id,
-                                        type="Outdated Software",
-                                        severity=python_rule["severity"],
-                                        file="Dockerfile",
-                                        line=line_num,
-                                        message=f"Outdated Python Docker base image version: python:{tag}. {python_rule['reason']}",
-                                        fix=python_rule["fix"]
-                                    ))
-                                detected_software.append(DetectedSoftware(
-                                    name="Docker Base: Python",
-                                    version=clean_version,
-                                    status=status,
-                                    type="Docker",
-                                    latest_stable=python_rule["min_secure_version"]
-                                ))
-                            elif "node" in image.lower() and node_rule:
-                                clean_version = re.sub(r'^[^\d]+', '', tag).split("-")[0]  # e.g., 16-alpine -> 16
-                                status = "Secure"
-                                if self.is_outdated(clean_version, node_rule["min_secure_version"]):
-                                    status = "Outdated"
-                                    issues.append(Issue(
-                                        scan_id=scan_id,
-                                        user_id=user_id,
-                                        type="Outdated Software",
-                                        severity=node_rule["severity"],
-                                        file="Dockerfile",
-                                        line=line_num,
-                                        message=f"Outdated Node Docker base image version: node:{tag}. {node_rule['reason']}",
-                                        fix=node_rule["fix"]
-                                    ))
-                                detected_software.append(DetectedSoftware(
-                                    name="Docker Base: Node",
-                                    version=clean_version,
-                                    status=status,
-                                    type="Docker",
-                                    latest_stable=node_rule["min_secure_version"]
-                                ))
-                            else:
-                                # Generic safe tag
-                                detected_software.append(DetectedSoftware(
-                                    name=f"Docker Image: {image}",
-                                    version=tag,
-                                    status="Secure",
-                                    type="Docker",
-                                    latest_stable=None
-                                ))
-            except Exception as e:
-                print(f"Error scanning Dockerfile base image: {e}")
-
-        return issues, detected_software

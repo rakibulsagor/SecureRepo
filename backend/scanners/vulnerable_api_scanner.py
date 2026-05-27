@@ -1,62 +1,47 @@
 import json
 import os
 import re
-from typing import List
-from backend.models.issue_models import Issue
-from backend.utils.file_filters import is_text_file, should_scan_dir, should_scan_file
+
+SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build"}
+TEXT_EXTENSIONS = {".js", ".jsx", ".ts", ".py", ".json", ".txt", ".md", ".yml", ".yaml", ".html", ".env"}
 
 
 class VulnerableApiScanner:
     def __init__(self):
-        self.rules = []
-        self.load_rules()
+        self.rules = self._load_rules()
 
-    def load_rules(self):
-        try:
-            dir_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            rules_path = os.path.join(dir_path, "data", "vulnerable_api_rules.json")
-            if os.path.exists(rules_path):
-                with open(rules_path, "r", encoding="utf-8") as f:
-                    self.rules = json.load(f)
-            else:
-                print(f"Warning: Vulnerable API rules not found at {rules_path}")
-        except Exception as e:
-            print(f"Error loading vulnerable API rules: {e}")
-
-    def scan(self, repo_path: str, scan_id: str = None, user_id: str = None) -> List[Issue]:
-        issues = []
-        if not self.rules:
-            return issues
-
+    def scan(self, repo_path):
+        findings = []
         for root, dirs, files in os.walk(repo_path):
-            dirs[:] = [d for d in dirs if should_scan_dir(d)]
-
-            for file in files:
-                if not should_scan_file(file):
+            dirs[:] = [directory for directory in dirs if directory not in SKIP_DIRS]
+            for filename in files:
+                full_path = os.path.join(root, filename)
+                if not self._is_text_file(full_path):
                     continue
 
-                full_path = os.path.join(root, file)
-                rel_path = os.path.relpath(full_path, repo_path).replace("\\", "/")
-
-                if not is_text_file(full_path):
-                    continue
-
+                relative_path = os.path.relpath(full_path, repo_path).replace("\\", "/")
                 try:
-                    with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
-                        for line_num, line in enumerate(f, 1):
+                    with open(full_path, "r", encoding="utf-8", errors="ignore") as file:
+                        for line_number, line in enumerate(file, 1):
                             for rule in self.rules:
                                 if re.search(rule["pattern"], line):
-                                    issues.append(Issue(
-                                        scan_id=scan_id,
-                                        user_id=user_id,
-                                        type="Vulnerable API",
-                                        severity=rule["severity"],
-                                        file=rel_path,
-                                        line=line_num,
-                                        message=rule["message"],
-                                        fix=rule["fix"]
-                                    ))
-                except Exception as e:
-                    print(f"Error scanning API usage in {rel_path}: {e}")
+                                    findings.append({
+                                        "type": "Vulnerable API",
+                                        "severity": rule["severity"],
+                                        "file": relative_path,
+                                        "line": line_number,
+                                        "message": rule["message"],
+                                        "fix": rule["fix"],
+                                    })
+                except OSError:
+                    continue
+        return findings
 
-        return issues
+    def _load_rules(self):
+        rules_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "vulnerable_api_rules.json")
+        with open(rules_path, "r", encoding="utf-8") as file:
+            return json.load(file)
+
+    def _is_text_file(self, path):
+        _, extension = os.path.splitext(path)
+        return extension.lower() in TEXT_EXTENSIONS

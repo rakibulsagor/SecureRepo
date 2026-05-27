@@ -1,81 +1,78 @@
 import os
-import json
 import re
-from typing import List
-from backend.models.issue_models import Issue
-from backend.utils.file_filters import should_scan_file, is_text_file
+
+SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build"}
+TEXT_EXTENSIONS = {".js", ".ts", ".py", ".json", ".txt", ".md", ".yml", ".yaml", ".env", ".html", ".css"}
+
+BEGINNER_RULES = [
+    {
+        "pattern": r"(?i)debug\s*=\s*True|DEBUG\s*=\s*True|debug\s*:\s*true",
+        "severity": "High",
+        "message": "Debug mode is enabled in application code.",
+        "fix": "Disable debug mode in production and control it with environment variables.",
+    },
+    {
+        "pattern": r"^<<<<<<< HEAD|^=======$|^>>>>>>> [0-9a-fA-F]{40}",
+        "severity": "Medium",
+        "message": "Git merge conflict marker committed.",
+        "fix": "Resolve the merge conflict, remove the markers, and commit clean code.",
+    },
+    {
+        "pattern": r"(?i)(?:password|passwd|db_pass|mysql_password|postgres_password)\s*=\s*['\"](?:admin|root|password|123456|pass123|qwerty)['\"]",
+        "severity": "High",
+        "message": "Common insecure hardcoded password detected.",
+        "fix": "Remove the hardcoded credential and load it from environment variables or a vault.",
+    },
+]
+
 
 class BeginnerMistakeScanner:
-    def __init__(self):
-        self.rules = []
-        self.load_rules()
-
-    def load_rules(self):
-        try:
-            dir_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            rules_path = os.path.join(dir_path, "data", "beginner_rules.json")
-            if os.path.exists(rules_path):
-                with open(rules_path, "r", encoding="utf-8") as f:
-                    all_rules = json.load(f)
-                # Select only rules categorized under 'Beginner Mistake'
-                self.rules = [r for r in all_rules if r.get("category") == "Beginner Mistake"]
-            else:
-                print(f"Warning: Rules file not found at {rules_path}")
-        except Exception as e:
-            print(f"Error loading beginner rules: {e}")
-
-    def scan(self, repo_path: str, scan_id: str = None, user_id: str = None) -> List[Issue]:
-        issues = []
-
-        # 1. Regex rule-based beginner mistake scanning
+    def scan(self, repo_path):
+        findings = []
         for root, dirs, files in os.walk(repo_path):
-            from backend.utils.file_filters import should_scan_dir
-            dirs[:] = [d for d in dirs if should_scan_dir(d)]
-
-            for file in files:
-                if not should_scan_file(file):
+            dirs[:] = [directory for directory in dirs if directory not in SKIP_DIRS]
+            for filename in files:
+                full_path = os.path.join(root, filename)
+                if not self._is_text_file(full_path):
                     continue
 
-                full_path = os.path.join(root, file)
-                rel_path = os.path.relpath(full_path, repo_path).replace("\\", "/")
-
-                if not is_text_file(full_path):
-                    continue
-
+                relative_path = os.path.relpath(full_path, repo_path).replace("\\", "/")
                 try:
-                    with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
-                        lines = f.readlines()
+                    with open(full_path, "r", encoding="utf-8", errors="ignore") as file:
+                        for line_number, line in enumerate(file, 1):
+                            findings.extend(self._check_rules(relative_path, line_number, line))
+                            findings.extend(self._check_local_paths(relative_path, line_number, line))
+                except OSError:
+                    continue
+        return findings
 
-                    for line_num, line in enumerate(lines, 1):
-                        for rule in self.rules:
-                            pattern = rule["pattern"]
-                            if re.search(pattern, line):
-                                issues.append(Issue(
-                                    scan_id=scan_id,
-                                    user_id=user_id,
-                                    type="Beginner Mistake",
-                                    severity=rule["severity"],
-                                    file=rel_path,
-                                    line=line_num,
-                                    message=rule["message"],
-                                    fix=rule["fix"]
-                                ))
-                                
-                        # 2. Custom check: Hardcoded local absolute paths (e.g. C:\Users\ or /home/username/)
-                        # We ignore common systems paths like /usr/bin or /tmp, looking specifically for user directories
-                        path_match = re.search(r'(?:[cC]:\\Users\\[a-zA-Z0-9_\-]+|/home/[a-zA-Z0-9_\-]+)/[a-zA-Z0-9_\-\./]+', line)
-                        if path_match:
-                            issues.append(Issue(
-                                scan_id=scan_id,
-                                user_id=user_id,
-                                type="Beginner Mistake",
-                                severity="Low",
-                                file=rel_path,
-                                line=line_num,
-                                message=f"Hardcoded absolute local path detected: '{path_match.group(0)}'. This will fail on other systems and leaks system usernames.",
-                                fix="Use relative paths relative to the project root, or fetch paths from environment variables (e.g., using `os.path.dirname(__file__)` or `pathlib.Path`)."
-                            ))
-                except Exception as e:
-                    print(f"Error scanning beginner mistake file {rel_path}: {e}")
+    def _check_rules(self, relative_path, line_number, line):
+        findings = []
+        for rule in BEGINNER_RULES:
+            if re.search(rule["pattern"], line):
+                findings.append({
+                    "type": "Beginner Mistake",
+                    "severity": rule["severity"],
+                    "file": relative_path,
+                    "line": line_number,
+                    "message": rule["message"],
+                    "fix": rule["fix"],
+                })
+        return findings
 
-        return issues
+    def _check_local_paths(self, relative_path, line_number, line):
+        match = re.search(r"(?:[cC]:\\Users\\[a-zA-Z0-9_-]+|/home/[a-zA-Z0-9_-]+)/[a-zA-Z0-9_./-]+", line)
+        if not match:
+            return []
+        return [{
+            "type": "Beginner Mistake",
+            "severity": "Low",
+            "file": relative_path,
+            "line": line_number,
+            "message": f"Hardcoded local absolute path detected: {match.group(0)}.",
+            "fix": "Use relative paths or build paths with pathlib instead of hardcoding machine-specific folders.",
+        }]
+
+    def _is_text_file(self, path):
+        _, extension = os.path.splitext(path)
+        return extension.lower() in TEXT_EXTENSIONS

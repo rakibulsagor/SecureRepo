@@ -1,21 +1,235 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300f0ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/%3E%3C/svg%3E" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    
-    <!-- Meta tags for SEO -->
-    <title>SecureRepo | Student-Friendly GitHub Security Scanner</title>
-    <meta name="description" content="SecureRepo helps student developers scan their public GitHub repositories for leaked secrets, risky files, outdated dependencies, and beginner security mistakes." />
-    
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="SecureRepo scans repositories for leaked secrets, risky files, exposed APIs, and beginner security mistakes.">
+    <title>SecureRepo - Security Mentor</title>
+    <link rel="stylesheet" href="styles.css">
   </head>
-  <body class="bg-cyber-darkest text-gray-100 font-sans antialiased overflow-x-hidden">
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#home" aria-label="SecureRepo home">
+        <span class="brand-icon">SR</span>
+        <span>SecureRepo</span>
+      </a>
+      <button class="menu-button" type="button" data-menu-button aria-expanded="false" aria-controls="primary-nav">
+        Menu
+      </button>
+      <nav class="primary-nav" id="primary-nav" data-primary-nav aria-label="Primary navigation">
+        <a href="#dashboard">Dashboard</a>
+        <a href="#scanner">Scanner</a>
+        <a href="#reports">Reports</a>
+        <a href="#learn">Learn</a>
+        <a href="#history">History</a>
+        <a href="#about">About</a>
+      </nav>
+      <a class="header-action" href="#scanner">Get Started</a>
+    </header>
+
+    <main id="home">
+      <section class="hero section-shell">
+        <div class="hero-copy">
+          <p class="eyebrow">Security mentor for students and developers</p>
+          <h1>Find the risks before they find you.</h1>
+          <p class="hero-text">
+            SecureRepo scans repositories for hardcoded secrets, exposed APIs, risky files, and common configuration
+            mistakes. It turns every report into practical security guidance while you code.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="#scanner">Start Scan</a>
+            <a class="button secondary" href="#learn">Learn Security Basics</a>
+          </div>
+        </div>
+
+        <aside class="scan-preview" aria-label="Example scan summary">
+          <div class="preview-bar"></div>
+          <div class="preview-header">
+            <div>
+              <span class="status-dot"></span>
+              <p>Demo scan</p>
+              <h2>Scan Complete</h2>
+            </div>
+            <strong>85/100</strong>
+          </div>
+          <div class="preview-row">
+            <span>Security score</span>
+            <b>85/100</b>
+          </div>
+          <div class="preview-row danger">
+            <span>Critical findings</span>
+            <b>2</b>
+          </div>
+          <div class="preview-stats">
+            <div><b>6</b><span>Checks</span></div>
+            <div><b>12</b><span>Files flagged</span></div>
+            <div><b>4</b><span>Fix guides</span></div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="scanner-band" id="scanner">
+        <div class="section-shell">
+          <div class="section-heading centered">
+            <p class="eyebrow">Scanner</p>
+            <h2>Scan a repository now</h2>
+            <p>Paste a public GitHub URL or use the bundled local demo repository.</p>
+          </div>
+
+          <form class="scan-form" data-scan-form>
+            <label class="field-label" for="repo-url">Repository URL or local path</label>
+            <div class="scan-input-row">
+              <input id="repo-url" name="repoUrl" type="text" autocomplete="off" placeholder="https://github.com/owner/repository or demo-vulnerable-repo" required>
+              <button class="button primary" type="submit">Scan Repo</button>
+            </div>
+            <div class="scan-options">
+              <label>
+                <input type="checkbox" name="useAi" checked>
+                Enable Gemini AI explanations
+              </label>
+              <div class="examples">
+                <span>Examples:</span>
+                <button type="button" data-example="demo-vulnerable-repo">Local Demo Repo</button>
+                <button type="button" data-example="https://github.com/expressjs/express">Express Public Repo</button>
+              </div>
+            </div>
+          </form>
+
+          <div class="alert hidden" data-alert role="alert"></div>
+          <div class="loading-panel hidden" data-loading>
+            <div class="loader"></div>
+            <h3>Analyzing repository</h3>
+            <p>SecureRepo is running rule-based scanners and preparing your report.</p>
+            <pre data-log-output>[INIT] Waiting for scan...</pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-shell" id="dashboard">
+        <div class="dashboard-grid">
+          <div>
+            <p class="eyebrow">Dashboard</p>
+            <h2>Your latest scan</h2>
+            <p class="muted">Run a scan to see score, severity counts, software versions, AI summary, and actionable fixes here.</p>
+          </div>
+          <div class="profile-card">
+            <h3>Local profile</h3>
+            <p class="muted">No frontend framework is used. This id stays in your browser and helps label local scan history.</p>
+            <label class="field-label" for="user-id">History user id</label>
+            <div class="profile-row">
+              <input id="user-id" data-user-id-input type="text">
+              <button class="button secondary" type="button" data-save-user>Save</button>
+            </div>
+          </div>
+        </div>
+
+        <article class="report-panel hidden" id="reports" data-report-panel>
+          <div class="report-header">
+            <div>
+              <p class="eyebrow">Reports</p>
+              <h2 data-report-title>Scan report</h2>
+              <p class="muted" data-report-repo></p>
+            </div>
+            <div class="score-badge">
+              <strong data-report-score>0</strong>
+              <span data-report-risk>Risk</span>
+            </div>
+          </div>
+          <div class="summary-grid" data-summary-grid></div>
+          <div class="ai-summary" data-ai-summary></div>
+          <div class="software-section">
+            <h3>Detected software</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Version</th>
+                    <th>Status</th>
+                    <th>Latest stable</th>
+                  </tr>
+                </thead>
+                <tbody data-software-body></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="issues-section">
+            <h3>Issues and fixes</h3>
+            <div class="issue-list" data-issue-list></div>
+          </div>
+        </article>
+      </section>
+
+      <section class="dark-section">
+        <div class="section-shell">
+          <div class="section-heading">
+            <p class="eyebrow">What we look for</p>
+            <h2>Security checks that teach while they scan</h2>
+          </div>
+          <div class="feature-grid" id="about">
+            <article class="feature-card red">
+              <h3>Secret Detection</h3>
+              <p>Find hardcoded API keys, database credentials, SSH keys, private certificates, and access tokens.</p>
+              <b>Why it matters</b>
+              <p>Exposed keys can lead to data breaches, account takeover, and unexpected cloud bills.</p>
+            </article>
+            <article class="feature-card amber">
+              <h3>Risky Files</h3>
+              <p>Detect .env files, service account JSON, PEM files, local databases, and private config files.</p>
+              <b>Why it matters</b>
+              <p>These files often contain environment-specific secrets or infrastructure details.</p>
+            </article>
+            <article class="feature-card blue">
+              <h3>Vulnerable APIs</h3>
+              <p>Spot plain HTTP calls, secrets in query strings, wildcard CORS, and exposed debug routes.</p>
+              <b>Why it matters</b>
+              <p>Unprotected endpoints can be abused to read, change, or delete application data.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-shell split-section" id="learn">
+        <div>
+          <p class="eyebrow">Learn</p>
+          <h2>Built for better habits</h2>
+          <p class="muted">
+            SecureRepo explains why each issue matters and how to avoid it next time. Detection stays deterministic;
+            AI is only used to explain scanner results in friendlier language.
+          </p>
+        </div>
+        <ol class="workflow-list">
+          <li><span>1</span>Submit a GitHub URL or local demo folder.</li>
+          <li><span>2</span>Run scanners for secrets, files, APIs, config, and versions.</li>
+          <li><span>3</span>Calculate a score and group findings by severity.</li>
+          <li><span>4</span>Show plain-English fixes and learning notes.</li>
+          <li><span>5</span>Save scan history for your local profile id.</li>
+        </ol>
+      </section>
+
+      <section class="history-band" id="history">
+        <div class="section-shell">
+          <div class="section-heading centered">
+            <p class="eyebrow">History</p>
+            <h2>Saved scans</h2>
+            <p>History is stored locally in this browser after each scan.</p>
+          </div>
+          <div class="history-actions">
+            <button class="button primary" type="button" data-load-history>Load History</button>
+          </div>
+          <div class="history-list" data-history-list></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div>
+        <strong>SecureRepo</strong>
+        <p>Plain HTML, CSS, JavaScript, and Python. No frontend framework.</p>
+      </div>
+      <span data-health-status>API status: checking...</span>
+    </footer>
+
+    <script src="app.js"></script>
   </body>
 </html>

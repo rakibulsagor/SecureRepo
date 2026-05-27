@@ -1,26 +1,29 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
-from backend.models.scan_models import ScanRequest, ScanResponse
-from backend.services.report_service import ReportService
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
+
+from services.report_service import ReportService
 
 router = APIRouter()
 report_service = ReportService()
 
-@router.post("/scan", response_model=ScanResponse)
-def run_repository_scan(request: ScanRequest):
-    """
-    Triggers a security scan on a public GitHub repository.
-    Can also scan a local path in debug mode.
-    """
+
+class ScanRequest(BaseModel):
+    repo_url: str = Field(..., description="GitHub URL or local repository path")
+    use_ai_explanation: Optional[bool] = Field(True, description="Whether to add beginner explanations")
+
+
+@router.post("/scan")
+def scan_repository(request: ScanRequest):
     try:
-        response = report_service.generate_report(
+        return report_service.generate_report(
             repo_url=request.repo_url,
-            user_id=request.user_id,
-            use_ai=request.use_ai_explanation
+            use_ai_explanation=bool(request.use_ai_explanation),
         )
-        return response
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except RuntimeError as e:
-        raise HTTPException(status_code=502, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal scanning error: {str(e)}")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Internal scanning error: {exc}")

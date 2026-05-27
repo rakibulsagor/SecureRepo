@@ -1,28 +1,31 @@
-from typing import List
-from backend.models.issue_models import Issue
+SEVERITY_WEIGHTS = {
+    "Critical": 25,
+    "High": 15,
+    "Medium": 8,
+    "Low": 3,
+}
 
-def calculate_score(issues: List[Issue]) -> int:
-    score = 100
 
-    penalties = {
-        "Critical": 25,
-        "High": 15,
-        "Medium": 8,
-        "Low": 3
-    }
+class ScoreService:
+    def calculate_score(self, findings):
+        penalty = 0
+        for finding in findings:
+            penalty += SEVERITY_WEIGHTS.get(finding.get("severity", "Low"), 3)
+        return max(0, 100 - penalty)
 
-    for issue in issues:
-        score -= penalties.get(issue.severity, 0)
+    def risk_level(self, score):
+        if score >= 90:
+            return "Low"
+        if score >= 75:
+            return "Medium"
+        if score >= 50:
+            return "High"
+        return "Critical"
 
-    return max(score, 0)
-
-def get_risk_level(score: int) -> str:
-    if score >= 90:
-        return "Excellent"
-    if score >= 75:
-        return "Good"
-    if score >= 50:
-        return "Medium Risk"
-    if score >= 25:
-        return "High Risk"
-    return "Critical Risk"
+    def summarize(self, findings):
+        summary = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+        for finding in findings:
+            severity = finding.get("severity", "Low").lower()
+            if severity in summary:
+                summary[severity] += 1
+        return summary

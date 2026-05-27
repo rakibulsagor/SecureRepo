@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 
 class GitHubService:
     def __init__(self):
-        self.project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.temp_root = os.path.join(tempfile.gettempdir(), "securerepo_temp_repos")
         os.makedirs(self.temp_root, exist_ok=True)
 

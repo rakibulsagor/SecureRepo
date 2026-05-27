@@ -1,8 +1,7 @@
 (function () {
   "use strict";
 
-  var isLocal = location.protocol === "file:" || location.hostname === "localhost" || location.hostname === "127.0.0.1";
-  var API_BASE = window.SECUREREPO_API_BASE || (isLocal ? (location.port === "8000" ? "" : "http://localhost:8000") : "");
+  var API_BASE = window.SECUREREPO_API_BASE || (location.protocol === "file:" ? "http://localhost:5000" : "");
   var STORAGE_KEY = "securerepoUserId";
   var HISTORY_KEY = "securerepoScanHistory";
   var logs = [

@@ -1,14 +1,14 @@
 {
-  "experimentalServices": {
-    "backend": {
-      "entrypoint": "backend/main.py",
-      "framework": "fastapi",
-      "routePrefix": "/",
-      "includeFiles": [
-        "backend/**",
-        "frontend/**",
-        "demo-vulnerable-repo/**"
-      ]
+  "builds": [
+    {
+      "src": "app.py",
+      "use": "@vercel/python"
     }
-  }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "app.py"
+    }
+  ]
 }

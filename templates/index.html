@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="SecureRepo scans repositories for leaked secrets, risky files, exposed APIs, and beginner security mistakes.">
     <title>SecureRepo - Security Mentor</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
   </head>
   <body>
     <header class="site-header">
@@ -230,6 +230,6 @@
       <span data-health-status>API status: checking...</span>
     </footer>
 
-    <script src="app.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
   </body>
 </html>

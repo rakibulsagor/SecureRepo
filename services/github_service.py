@@ -5,7 +5,9 @@ import stat
 import subprocess
 import tempfile
 import uuid
+import zipfile
 from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 
 class GitHubService:
@@ -26,17 +28,21 @@ class GitHubService:
 
         clone_url, repository = self._parse_github_url(repo_url)
         target_path = os.path.join(self.temp_root, f"scan_{uuid.uuid4().hex}")
-        try:
-            subprocess.run(
-                ["git", "clone", "--depth", "1", clone_url, target_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                check=True,
-            )
-        except subprocess.CalledProcessError as exc:
-            self.cleanup(target_path)
-            raise RuntimeError(exc.stderr or exc.stdout or "Failed to clone repository.")
+
+        if shutil.which("git"):
+            try:
+                subprocess.run(
+                    ["git", "clone", "--depth", "1", clone_url, target_path],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    check=True,
+                )
+            except subprocess.CalledProcessError as exc:
+                self.cleanup(target_path)
+                raise RuntimeError(exc.stderr or exc.stdout or "Failed to clone repository.")
+        else:
+            self._download_repository_zip(repository, target_path)
 
         return {
             "path": target_path,
@@ -87,6 +93,41 @@ class GitHubService:
 
         owner, repo = parts[0], parts[1]
         return f"https://github.com/{owner}/{repo}.git", f"{owner}/{repo}"
+
+    def _download_repository_zip(self, repository, target_path):
+        zip_path = f"{target_path}.zip"
+        zip_url = f"https://api.github.com/repos/{repository}/zipball"
+        os.makedirs(target_path, exist_ok=True)
+
+        try:
+            request = Request(zip_url, headers={"User-Agent": "SecureRepo"})
+            with urlopen(request, timeout=45) as response:
+                with open(zip_path, "wb") as zip_file:
+                    shutil.copyfileobj(response, zip_file)
+
+            with zipfile.ZipFile(zip_path) as archive:
+                archive.extractall(target_path)
+
+            extracted_items = [
+                os.path.join(target_path, item)
+                for item in os.listdir(target_path)
+            ]
+            extracted_dirs = [item for item in extracted_items if os.path.isdir(item)]
+
+            if len(extracted_dirs) == 1:
+                source_dir = extracted_dirs[0]
+                for item in os.listdir(source_dir):
+                    shutil.move(os.path.join(source_dir, item), target_path)
+                shutil.rmtree(source_dir, onerror=self._remove_readonly)
+        except Exception as exc:
+            self.cleanup(target_path)
+            raise RuntimeError(
+                "Git is not installed or not available in PATH, and the GitHub ZIP download failed. "
+                f"Install Git or check the repository URL. Details: {exc}"
+            )
+        finally:
+            if os.path.exists(zip_path):
+                os.remove(zip_path)
 
     def _remove_readonly(self, func, path, _):
         os.chmod(path, stat.S_IWRITE)

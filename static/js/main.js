@@ -19,6 +19,8 @@
   var loadingPanel = document.querySelector("[data-loading]");
   var logOutput = document.querySelector("[data-log-output]");
   var reportPanel = document.querySelector("[data-report-panel]");
+  var resultsPlaceholder = document.getElementById("results-placeholder");
+  var scanButton = document.querySelector("[data-scan-button]");
   var userIdInput = document.querySelector("[data-user-id-input]");
   var healthStatus = document.querySelector("[data-health-status]");
   var historyList = document.querySelector("[data-history-list]");
@@ -43,7 +45,9 @@
   function setUserId(value) {
     var clean = value.trim() || getUserId();
     localStorage.setItem(STORAGE_KEY, clean);
-    userIdInput.value = clean;
+    if (userIdInput) {
+      userIdInput.value = clean;
+    }
     showAlert("Saved local profile id.", "success");
   }
 
@@ -73,6 +77,10 @@
   function startLoading() {
     var index = 0;
     loadingPanel.classList.remove("hidden");
+    if (scanButton) {
+      scanButton.disabled = true;
+      scanButton.textContent = "Scanning...";
+    }
     logOutput.textContent = "[INIT] Starting SecureRepo scanner...";
     clearInterval(logTimer);
     logTimer = setInterval(function () {
@@ -88,6 +96,10 @@
   function stopLoading() {
     clearInterval(logTimer);
     loadingPanel.classList.add("hidden");
+    if (scanButton) {
+      scanButton.disabled = false;
+      scanButton.textContent = "Start Scan";
+    }
   }
 
   function request(path, options) {
@@ -122,7 +134,7 @@
       })
       .catch(function (error) {
         stopLoading();
-        showAlert(error.message || "Scan failed. Make sure the repository is public and git is installed.");
+        showAlert(error.message || "Scan failed. Make sure the repository is public or try the local demo repository.");
       });
   }
 
@@ -131,10 +143,18 @@
     var issues = report.findings || [];
 
     reportPanel.classList.remove("hidden");
+    if (resultsPlaceholder) {
+      resultsPlaceholder.classList.add("hidden");
+    }
     document.querySelector("[data-report-title]").textContent = report.repository ? report.repository + " scan report" : "Scan report";
     document.querySelector("[data-report-repo]").textContent = report.repository || "";
     document.querySelector("[data-report-score]").textContent = report.score == null ? "0" : report.score;
     document.querySelector("[data-report-risk]").textContent = report.risk_level || "Unknown risk";
+
+    var ring = document.querySelector(".score-ring");
+    if (ring) {
+      ring.className = "score-ring " + String(report.risk_level || "").toLowerCase();
+    }
 
     document.querySelector("[data-summary-grid]").innerHTML = [
       ["critical", summary.critical || 0],
@@ -142,33 +162,35 @@
       ["medium", summary.medium || 0],
       ["low", summary.low || 0]
     ].map(function (item) {
-      return '<div class="summary-card"><b>' + item[1] + '</b><span>' + item[0] + '</span></div>';
+      return '<div class="summary-count ' + item[0] + '"><strong>' + item[1] + '</strong><span>' + item[0] + '</span></div>';
     }).join("");
 
     document.querySelector("[data-ai-summary]").innerHTML = "<strong>Report summary</strong><p>SecureRepo found " + issues.length + " issue(s). Review each finding and apply the recommended fixes before sharing this repository.</p>";
-
-    document.querySelector("[data-software-body]").innerHTML = '<tr><td colspan="4">Software version issues are listed with the rest of the findings below.</td></tr>';
 
     document.querySelector("[data-issue-list]").innerHTML = issues.length ? issues.map(renderIssue).join("") : '<div class="issue-card">No issues found. Nice clean scan.</div>';
   }
 
   function renderIssue(issue) {
     var severity = String(issue.severity || "low").toLowerCase();
-    return '<article class="issue-card">' +
-      '<div class="issue-top">' +
-      '<div><span class="severity ' + escapeHtml(severity) + '">' + escapeHtml(issue.severity || "Low") + '</span> <strong>' + escapeHtml(issue.type || "Issue") + '</strong></div>' +
-      '<span class="file-path">' + escapeHtml(issue.file || "unknown file") + (issue.line ? ":" + escapeHtml(issue.line) : "") + '</span>' +
+    var explanation = issue.beginner_explanation || issue.studentExplanation || "";
+    return '<article class="finding-card">' +
+      '<div class="finding-bar ' + escapeHtml(severity) + '"></div>' +
+      '<div class="finding-body">' +
+      '<div class="finding-header">' +
+      '<div class="finding-title"><span class="severity ' + escapeHtml(severity) + '">' + escapeHtml(issue.severity || "Low") + '</span><h3>' + escapeHtml(issue.type || "Issue") + '</h3></div>' +
       '</div>' +
+      '<span class="file-path"><span class="material-symbols-outlined">description</span>' + escapeHtml(issue.file || "unknown file") + (issue.line ? " : Line " + escapeHtml(issue.line) : "") + '</span>' +
       '<p>' + escapeHtml(issue.message || "") + '</p>' +
-      '<p><strong>Fix:</strong> ' + escapeHtml(issue.fix || "Review this finding and update the affected code.") + '</p>' +
-      (issue.studentExplanation ? '<p><strong>Explanation:</strong> ' + escapeHtml(issue.studentExplanation) + '</p>' : "") +
+      (explanation ? '<div class="beginner-box"><h4><span class="material-symbols-outlined">lightbulb</span> Beginner Explanation</h4><p>' + escapeHtml(explanation) + '</p></div>' : "") +
+      '<div class="finding-fix"><span><span class="material-symbols-outlined">warning</span> Recommended: ' + escapeHtml(issue.fix || "Review this finding and update the affected code.") + '</span><button class="button primary" type="button">View Fix Guide</button></div>' +
+      '</div>' +
       '</article>';
   }
 
   function loadHistory(showMessage) {
     var scans = getSavedReports();
     if (!scans.length) {
-      historyList.innerHTML = '<div class="history-card">No saved scans yet. Run your first scan above.</div>';
+      historyList.innerHTML = '<div class="history-card"><strong>No scans yet</strong><p>Run your first scan above.</p></div>';
       if (showMessage) {
         showAlert("No local scan history found for this browser.", "success");
       }
@@ -184,11 +206,11 @@
     return '<article class="history-card">' +
       '<div class="history-top">' +
       '<div><strong>' + escapeHtml(scan.repository || "Repository") + '</strong><p class="muted">' + escapeHtml(date) + '</p></div>' +
-      '<span class="score-badge"><strong>' + escapeHtml(scan.score == null ? "0" : scan.score) + '</strong><span>' + escapeHtml(scan.risk_level || "Risk") + '</span></span>' +
+      '<span class="mini-status ' + escapeHtml(String(scan.risk_level || "low").toLowerCase()) + '">' + escapeHtml(scan.risk_level || "Risk") + '</span>' +
       '</div>' +
       '<p>Critical: ' + (counts.critical || 0) + ' | High: ' + (counts.high || 0) + ' | Medium: ' + (counts.medium || 0) + ' | Low: ' + (counts.low || 0) + '</p>' +
-      '<button class="button secondary" type="button" data-open-scan="' + escapeHtml(entry.id) + '">Open report</button> ' +
-      '<button class="button secondary" type="button" data-delete-scan="' + escapeHtml(entry.id) + '">Delete</button>' +
+      '<button class="link-button" type="button" data-open-scan="' + escapeHtml(entry.id) + '">Open report</button> ' +
+      '<button class="link-button" type="button" data-delete-scan="' + escapeHtml(entry.id) + '">Delete</button>' +
       '</article>';
   }
 
@@ -234,7 +256,7 @@
   function checkHealth() {
     request("/health")
       .then(function (health) {
-        healthStatus.textContent = "API status: " + health.status + " | Firebase: " + health.firebase_mode + " | Gemini: " + health.gemini_mode;
+        healthStatus.textContent = "API status: " + health.status + " | " + (health.service || "SecureRepo");
       })
       .catch(function () {
         healthStatus.textContent = "API status: offline";
@@ -260,12 +282,17 @@
       });
     });
 
-    document.querySelector("[data-save-user]").addEventListener("click", function () {
-      setUserId(userIdInput.value);
-    });
+    var saveUserButton = document.querySelector("[data-save-user]");
+    if (saveUserButton && userIdInput) {
+      saveUserButton.addEventListener("click", function () {
+        setUserId(userIdInput.value);
+      });
+    }
 
-    document.querySelector("[data-load-history]").addEventListener("click", function () {
-      loadHistory(true);
+    document.querySelectorAll("[data-load-history]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        loadHistory(true);
+      });
     });
 
     historyList.addEventListener("click", function (event) {
@@ -291,7 +318,11 @@
   }
 
   function init() {
-    userIdInput.value = getUserId();
+    if (userIdInput) {
+      userIdInput.value = getUserId();
+    } else {
+      getUserId();
+    }
     bindEvents();
     checkHealth();
     loadHistory(false);
